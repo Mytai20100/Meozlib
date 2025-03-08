@@ -1,573 +1,218 @@
--- MeozLib.lua - Thư viện Lua cho Roblox với tính năng tùy biến cao
-local MeozLib = {}
-MeozLib.Version = "1.0.0"
-
--- Dịch vụ Roblox
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local Meozlib = {}
+Meozlib.__index = Meozlib
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
-local workspace = game.Workspace
-local camera = workspace.CurrentCamera
-local player = Players.LocalPlayer
-
--- Biến toàn cục
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-
--- Tải UI (Rayfield hoặc Kavo, tùy executor hỗ trợ)
-local UI = nil
-local function loadUI()
-    if not UI then
-        local success, rayfield = pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield'))() end)
-        if success then
-            UI = rayfield
-        else
-            local success, kavo = pcall(function() return loadstring(game:HttpGet('https://raw.githubusercontent.com/RegularVynixu/UI-Libs/main/KavoUI.lua'))() end)
-            if success then
-                UI = kavo
-            else
-                warn("[MeozLib] No UI library loaded (Rayfield or Kavo not supported)")
-                UI = {CreateWindow = function() return {CreateTab = function() return {} end} end}
-            end
-        end
-    end
-    return UI
+local Themes = {
+    Dark = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Text = Color3.fromRGB(255, 255, 255),
+        Bar = Color3.fromRGB(0, 170, 255),
+        Blur = Color3.fromRGB(50, 50, 50),
+        Shadow = Color3.fromRGB(20, 20, 20)
+    },
+    Light = {
+        Background = Color3.fromRGB(245, 245, 245),
+        Text = Color3.fromRGB(0, 0, 0),
+        Bar = Color3.fromRGB(0, 120, 255),
+        Blur = Color3.fromRGB(200, 200, 200),
+        Shadow = Color3.fromRGB(150, 150, 150)
+    },
+    Pink = {
+        Background = Color3.fromRGB(240, 150, 200),
+        Text = Color3.fromRGB(255, 255, 255),
+        Bar = Color3.fromRGB(255, 100, 150),
+        Blur = Color3.fromRGB(220, 130, 180),
+        Shadow = Color3.fromRGB(200, 100, 150)
+    }
+}
+local UIVersion = "1.2.0"
+function Meozlib.new()
+    local self = setmetatable({}, Meozlib)
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Name = "MeozlibUI"
+    self.ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    self.ScreenGui.ResetOnSpawn = false
+    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    self.Blur = Instance.new("BlurEffect")
+    self.Blur.Size = 0
+    self.Blur.Parent = game.Lighting
+    self.Blur.Enabled = true
+    self.MainFrame = Instance.new("Frame")
+    self.MainFrame.Size = UDim2.new(0, 300, 0, 180)
+    self.MainFrame.Position = UDim2.new(0.5, -150, 0.5, -90)
+    self.MainFrame.BackgroundColor3 = Themes.Dark.Background
+    self.MainFrame.BorderSizePixel = 0
+    self.MainFrame.BackgroundTransparency = 0
+    self.MainFrame.Parent = self.ScreenGui
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 12)
+    UICorner.Parent = self.MainFrame
+    self.Shadow = Instance.new("ImageLabel")
+    self.Shadow.Name = "Shadow"
+    self.Shadow.BackgroundTransparency = 1
+    self.Shadow.Image = "rbxassetid://1316045217"
+    self.Shadow.ImageColor3 = Themes.Dark.Shadow
+    self.Shadow.ImageTransparency = 0.6
+    self.Shadow.Size = UDim2.new(1, 40, 1, 40)
+    self.Shadow.Position = UDim2.new(0, -20, 0, -20)
+    self.Shadow.ZIndex = -1
+    self.Shadow.Parent = self.MainFrame
+    self.Title = Instance.new("TextLabel")
+    self.Title.Size = UDim2.new(0.7, 0, 0, 40)
+    self.Title.Position = UDim2.new(0.15, 0, 0, 10)
+    self.Title.BackgroundTransparency = 1
+    self.Title.Text = "Meozhub"
+    self.Title.TextColor3 = Themes.Dark.Text
+    self.Title.TextSize = 24
+    self.Title.Font = Enum.Font.GothamBold
+    self.Title.TextXAlignment = Enum.TextXAlignment.Center
+    self.Title.Parent = self.MainFrame
+    self.VersionText = Instance.new("TextLabel")
+    self.VersionText.Size = UDim2.new(0.3, 0, 0, 20)
+    self.VersionText.Position = UDim2.new(0.7, 0, 0, 20)
+    self.VersionText.BackgroundTransparency = 1
+    self.VersionText.Text = "v" .. UIVersion
+    self.VersionText.TextColor3 = Themes.Dark.Text
+    self.VersionText.TextSize = 14
+    self.VersionText.Font = Enum.Font.Gotham
+    self.VersionText.TextXAlignment = Enum.TextXAlignment.Right
+    self.VersionText.Visible = false
+    self.VersionText.Parent = self.MainFrame
+    self.ProgressBar = Instance.new("Frame")
+    self.ProgressBar.Size = UDim2.new(0.9, 0, 0, 10)
+    self.ProgressBar.Position = UDim2.new(0.05, 0, 0.5, 0)
+    self.ProgressBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    self.ProgressBar.Parent = self.MainFrame
+    local ProgressCorner = Instance.new("UICorner")
+    ProgressCorner.CornerRadius = UDim.new(1, 0)
+    ProgressCorner.Parent = self.ProgressBar
+    self.ProgressFill = Instance.new("Frame")
+    self.ProgressFill.Size = UDim2.new(0, 0, 1, 0)
+    self.ProgressFill.BackgroundColor3 = Themes.Dark.Bar
+    self.ProgressFill.BorderSizePixel = 0
+    self.ProgressFill.Parent = self.ProgressBar
+    local FillCorner = Instance.new("UICorner")
+    FillCorner.CornerRadius = UDim.new(1, 0)
+    FillCorner.Parent = self.ProgressFill
+    self.LoadingText = Instance.new("TextLabel")
+    self.LoadingText.Size = UDim2.new(1, 0, 0, 30)
+    self.LoadingText.Position = UDim2.new(0, 0, 0.65, 0)
+    self.LoadingText.BackgroundTransparency = 1
+    self.LoadingText.Text = "Loading..."
+    self.LoadingText.TextColor3 = Themes.Dark.Text
+    self.LoadingText.TextSize = 16
+    self.LoadingText.Font = Enum.Font.Gotham
+    self.LoadingText.TextXAlignment = Enum.TextXAlignment.Center
+    self.LoadingText.Parent = self.MainFrame
+    self.CountryText = Instance.new("TextLabel")
+    self.CountryText.Size = UDim2.new(1, 0, 0, 20)
+    self.CountryText.Position = UDim2.new(0, 0, 0.85, 0)
+    self.CountryText.BackgroundTransparency = 1
+    self.CountryText.Text = ""
+    self.CountryText.TextColor3 = Themes.Dark.Text
+    self.CountryText.TextSize = 14
+    self.CountryText.Font = Enum.Font.Gotham
+    self.CountryText.TextXAlignment = Enum.TextXAlignment.Center
+    self.CountryText.Visible = false
+    self.CountryText.Parent = self.MainFrame
+    self.CurrentTheme = "Dark"
+    self.Messages = {}
+    return self
 end
-
--- Khởi tạo Window UI
-local Window = loadUI():CreateWindow({
-    Name = "MeozLib",
-    LoadingTitle = "MeozLib Loading",
-    LoadingSubtitle = "by Grok 3",
-    ConfigurationSaving = {Enabled = true, FolderName = "MeozLib", FileName = "MeozConfig"}
-})
-
--- Tạo các tab
-local MainTab = Window:CreateTab("Main", 4483362458)
-local AttackTab = Window:CreateTab("Attack", 4483362458)
-local MiscTab = Window:CreateTab("Misc", 4483362458)
-
--- Hàm thông báo
-local function notify(title, content, duration)
-    if UI.Notify then
-        UI:Notify({
-            Title = title,
-            Content = content,
-            Duration = duration or 6.5,
-            Image = 4483362458
-        })
+function Meozlib:SetTitle(titleText)
+    self.Title.Text = titleText or "Meozhub"
+end
+function Meozlib:ToggleTransparency(enabled)
+    local tweenInfo = TweenInfo.new(0.3)
+    local goal = enabled and {BackgroundTransparency = 0.5} or {BackgroundTransparency = 0}
+    TweenService:Create(self.MainFrame, tweenInfo, goal):Play()
+end
+function Meozlib:ToggleBlur(enabled)
+    local tweenInfo = TweenInfo.new(0.5)
+    local goal = enabled and {Size = 15} or {Size = 0}
+    TweenService:Create(self.Blur, tweenInfo, goal):Play()
+end
+function Meozlib:SetTheme(themeName)
+    local theme = Themes[themeName] or Themes.Dark
+    self.CurrentTheme = themeName
+    self.MainFrame.BackgroundColor3 = theme.Background
+    self.Title.TextColor3 = theme.Text
+    self.VersionText.TextColor3 = theme.Text
+    self.LoadingText.TextColor3 = theme.Text
+    self.CountryText.TextColor3 = theme.Text
+    self.ProgressFill.BackgroundColor3 = theme.Bar
+    self.Shadow.ImageColor3 = theme.Shadow
+    if self.ColorCorrection then
+        self.ColorCorrection.TintColor = theme.Blur
     else
-        warn("[MeozLib] Notification: " .. title .. " - " .. content)
+        self.ColorCorrection = Instance.new("ColorCorrectionEffect")
+        self.ColorCorrection.TintColor = theme.Blur
+        self.ColorCorrection.Parent = game.Lighting
     end
 end
-
--- Hàm gửi Webhook (tùy chọn)
-local function sendWebhook(message, url)
-    url = url or "https://discord.com/api/webhooks/your_webhook_id/your_webhook_token" -- Thay bằng URL thật
-    local data = {
-        ["content"] = message,
-        ["username"] = "MeozLib Bot",
-        ["avatar_url"] = "https://www.roblox.com/asset-thumbnail/image?assetId=11575879600"
-    }
-    local success, err = pcall(function()
-        game:HttpPost(url, HttpService:JSONEncode(data), "application/json")
+function Meozlib:ToggleVersion(enabled)
+    self.VersionText.Visible = enabled
+end
+function Meozlib:ToggleCountry(enabled)
+    if enabled then
+        local success, result = pcall(function()
+            local ip = game:HttpGet("https://api.ipify.org")
+            local country = HttpService:JSONDecode(game:HttpGet("http://ip-api.com/json/" .. ip)).country
+            self.CountryText.Text = "Country: " .. country
+            self.CountryText.Visible = true
+        end)
+        if not success then
+            self.CountryText.Text = "Country: Unavailable"
+            self.CountryText.Visible = true
+        end
+    else
+        self.CountryText.Visible = false
+    end
+end
+function Meozlib:StartLoading(messages, durationPerMessage)
+    self.Messages = messages or {}
+    durationPerMessage = durationPerMessage or 2
+    local totalDuration = #self.Messages > 0 and (#self.Messages * durationPerMessage) or 3
+    
+    local tweenInfo = TweenInfo.new(totalDuration)
+    local tween = TweenService:Create(self.ProgressFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
+    self.MainFrame.BackgroundTransparency = 1
+    self.MainFrame:TweenSizeAndPosition(
+        UDim2.new(0, 350, 0, 200),
+        UDim2.new(0.5, -175, 0.5, -100),
+        "Out",
+        "Quad",
+        0.3,
+        true
+    )
+    TweenService:Create(self.MainFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+    spawn(function()
+        if #self.Messages > 0 then
+            for i, msg in ipairs(self.Messages) do
+                self.LoadingText.Text = msg
+                wait(durationPerMessage)
+            end
+        end
+        local dots = 0
+        while wait(0.3) do
+            dots = (dots + 1) % 4
+            self.LoadingText.Text = "Loading" .. string.rep(".", dots)
+            if self.ProgressFill.Size.X.Scale >= 1 then
+                break
+            end
+        end
     end)
-    if not success then warn("[MeozLib] Webhook failed: " .. err) end
+    tween:Play()
 end
-
--- Tính năng ESP (Tùy biến cao)
-MeozLib.ESP = {}
-function MeozLib.ESP:Create(options)
-    options = options or {}
-    local espEnabled = false
-    local espColor = options.Color or Color3.fromRGB(255, 0, 0)
-    local espSize = options.Size or 14
-    local espRange = options.Range or 200
-    local espText = options.TextFormat or "{name} | HP: {hp} | Distance: {distance} studs"
-    local espDrawings = {}
-
-    local Drawing = Drawing or {}
-    if not Drawing.new then Drawing.new = function() return {} end end
-
-    local function createESPDrawing(target, text)
-        local esp = Drawing.new("Text")
-        esp.Text = text
-        esp.Color = espColor
-        esp.Size = espSize
-        esp.Outline = true
-        esp.Center = true
-        esp.Visible = false
-        return esp
-    end
-
-    local function updateESP()
-        if not espEnabled or not character or not humanoidRootPart or not camera then return end
-        local success, err = pcall(function()
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= player and plr.Character then
-                    local root = plr.Character:FindFirstChild("HumanoidRootPart")
-                    local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
-                    if root and humanoid and humanoid.Health > 0 then
-                        local distance = (root.Position - humanoidRootPart.Position).Magnitude
-                        if distance <= espRange then
-                            local screenPos = camera:WorldToScreenPoint(root.Position)
-                            if screenPos.Z > 0 then
-                                local text = espText
-                                    :gsub("{name}", plr.Name)
-                                    :gsub("{hp}", math.floor(humanoid.Health))
-                                    :gsub("{distance}", math.floor(distance))
-                                local esp = espDrawings[plr]
-                                if not esp then
-                                    esp = createESPDrawing(root, text)
-                                    espDrawings[plr] = esp
-                                end
-                                esp.Text = text
-                                esp.Position = Vector2.new(screenPos.X, screenPos.Y - 20)
-                                esp.Visible = true
-                            else
-                                if espDrawings[plr] then
-                                    espDrawings[plr].Visible = false
-                                end
-                            end
-                        else
-                            if espDrawings[plr] then
-                                espDrawings[plr].Visible = false
-                            end
-                        end
-                    else
-                        if espDrawings[plr] then
-                            espDrawings[plr].Visible = false
-                        end
-                    end
-                end
-            end
-            for plr, esp in pairs(espDrawings) do
-                if not Players:FindFirstChild(plr.Name) or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
-                    esp.Visible = false
-                    esp:Remove()
-                    espDrawings[plr] = nil
-                end
-            end
-        end)
-        if not success then warn("[MeozLib ESP] Error: " .. err) end
-    end
-
-    -- UI cho ESP
-    local espToggle = MainTab:CreateToggle({
-        Name = "Enable ESP",
-        CurrentValue = false,
-        Flag = "ESPToggle",
-        Callback = function(value)
-            espEnabled = value
-            if espEnabled then
-                task.spawn(function()
-                    while espEnabled do
-                        updateESP()
-                        task.wait(0.2) -- Tốc độ cập nhật nhanh
-                    end
-                end)
-                notify("ESP Enabled", "ESP activated successfully!", 6.5)
-            else
-                for _, esp in pairs(espDrawings) do esp:Remove() end
-                espDrawings = {}
-                notify("ESP Disabled", "ESP turned off!", 6.5)
-            end
+function Meozlib:Destroy()
+    self:ToggleBlur(false)
+    TweenService:Create(self.MainFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    self.MainFrame:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Quad", 0.3, true, function()
+        self.ScreenGui:Destroy()
+        self.Blur:Destroy()
+        if self.ColorCorrection then
+            self.ColorCorrection:Destroy()
         end
-    })
-
-    MainTab:CreateColorPicker({
-        Name = "ESP Color",
-        Color = espColor,
-        Flag = "ESPColor",
-        Callback = function(value)
-            espColor = value
-            for _, esp in pairs(espDrawings) do esp.Color = espColor end
-        end
-    })
-
-    MainTab:CreateSlider({
-        Name = "ESP Range",
-        Range = {50, 500},
-        Increment = 50,
-        Suffix = "Studs",
-        CurrentValue = espRange,
-        Flag = "ESPRange",
-        Callback = function(value)
-            espRange = value
-            notify("ESP Range Updated", "Range set to " .. value .. " studs", 5)
-        end
-    })
-
-    MainTab:CreateSlider({
-        Name = "ESP Text Size",
-        Range = {10, 20},
-        Increment = 1,
-        Suffix = "px",
-        CurrentValue = espSize,
-        Flag = "ESPSize",
-        Callback = function(value)
-            espSize = value
-            for _, esp in pairs(espDrawings) do esp.Size = espSize end
-            notify("ESP Size Updated", "Text size set to " .. value .. "px", 5)
-        end
-    })
-
-    MainTab:CreateTextbox({
-        Name = "ESP Text Format",
-        Value = espText,
-        Flag = "ESPText",
-        Callback = function(value)
-            espText = value
-            notify("ESP Format Updated", "Text format set to: " .. value, 5)
-        end
-    })
-
-    return {
-        Enable = function() espToggle:Set(true) end,
-        Disable = function() espToggle:Set(false) end,
-        SetColor = function(color) MainTab:GetElement("ESPColor"):Set(color) end,
-        SetRange = function(range) MainTab:GetElement("ESPRange"):Set(range) end,
-        SetSize = function(size) MainTab:GetElement("ESPSize"):Set(size) end,
-        SetTextFormat = function(format) MainTab:GetElement("ESPText"):Set(format) end
-    }
+    end)
 end
-
--- Tính năng Aimbot (Tùy biến cao)
-MeozLib.Aimbot = {}
-function MeozLib.Aimbot:Create(options)
-    options = options or {}
-    local aimbotEnabled, aimheadEnabled = false, false
-    local aimSpeed = options.Speed or 0.1
-    local aimRange = options.Range or 100
-    local aimTarget = options.Target or "Head"
-
-    local function findNearestEnemy()
-        if not character or not humanoidRootPart then return nil end
-        local nearestEnemy, shortestDistance = nil, math.huge
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= player and (not plr.Team or plr.Team ~= player.Team) and plr.Character then
-                local root = plr.Character:FindFirstChild("HumanoidRootPart")
-                local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
-                if root and humanoid and humanoid.Health > 0 then
-                    local distance = (root.Position - humanoidRootPart.Position).Magnitude
-                    if distance < shortestDistance and distance <= aimRange then
-                        shortestDistance = distance
-                        nearestEnemy = plr
-                    end
-                end
-            end
-        end
-        return nearestEnemy
-    end
-
-    local function aimbotLoop()
-        while aimbotEnabled do
-            if not camera or not humanoidRootPart then
-                task.wait(1)
-                continue
-            end
-            local target = findNearestEnemy()
-            if target and target.Character then
-                local targetPart = target.Character:FindFirstChild(aimTarget == "Head" and "Head" or "HumanoidRootPart")
-                if targetPart then
-                    camera.CFrame = CFrame.new(camera.CFrame.Position, targetPart.Position)
-                end
-            end
-            task.wait(aimSpeed)
-        end
-    end
-
-    local function aimheadLoop()
-        while aimheadEnabled do
-            if not camera or not humanoidRootPart then
-                task.wait(1)
-                continue
-            end
-            local target = findNearestEnemy()
-            if target and target.Character then
-                local targetHead = target.Character:FindFirstChild("Head")
-                if targetHead then
-                    local direction = (targetHead.Position - camera.CFrame.Position).Unit
-                    local newLook = camera.CFrame.LookVector:Lerp(direction, 0.1)
-                    camera.CFrame = CFrame.new(camera.CFrame.Position, camera.CFrame.Position + newLook)
-                end
-            end
-            task.wait(aimSpeed)
-        end
-    end
-
-    -- UI cho Aimbot
-    local aimbotToggle = AttackTab:CreateToggle({
-        Name = "Enable Aimbot",
-        CurrentValue = false,
-        Flag = "AimbotToggle",
-        Callback = function(value)
-            aimbotEnabled = value
-            if aimbotEnabled then
-                task.spawn(aimbotLoop)
-                notify("Aimbot Enabled", "Aimbot activated!", 6.5)
-            else
-                notify("Aimbot Disabled", "Aimbot turned off!", 6.5)
-            end
-        end
-    })
-
-    local aimheadToggle = AttackTab:CreateToggle({
-        Name = "Enable Aimhead",
-        CurrentValue = false,
-        Flag = "AimheadToggle",
-        Callback = function(value)
-            aimheadEnabled = value
-            if aimheadEnabled then
-                task.spawn(aimheadLoop)
-                notify("Aimhead Enabled", "Aimhead activated!", 6.5)
-            else
-                notify("Aimhead Disabled", "Aimhead turned off!", 6.5)
-            end
-        end
-    })
-
-    AttackTab:CreateSlider({
-        Name = "Aimbot Range",
-        Range = {50, 500},
-        Increment = 50,
-        Suffix = "Studs",
-        CurrentValue = aimRange,
-        Flag = "AimbotRange",
-        Callback = function(value)
-            aimRange = value
-            notify("Aimbot Range Updated", "Range set to " .. value .. " studs", 5)
-        end
-    })
-
-    AttackTab:CreateSlider({
-        Name = "Aimbot Speed",
-        Range = {0.01, 1},
-        Increment = 0.01,
-        Suffix = "s",
-        CurrentValue = aimSpeed,
-        Flag = "AimbotSpeed",
-        Callback = function(value)
-            aimSpeed = value
-            notify("Aimbot Speed Updated", "Speed set to " .. value .. " seconds", 5)
-        end
-    })
-
-    AttackTab:CreateDropdown({
-        Name = "Aimbot Target",
-        Options = {"Head", "HumanoidRootPart"},
-        CurrentOption = aimTarget,
-        Flag = "AimbotTarget",
-        Callback = function(value)
-            aimTarget = value
-            notify("Aimbot Target Updated", "Targeting " .. value, 5)
-        end
-    })
-
-    return {
-        EnableAimbot = function() aimbotToggle:Set(true) end,
-        EnableAimhead = function() aimheadToggle:Set(true) end,
-        DisableAimbot = function() aimbotToggle:Set(false) end,
-        DisableAimhead = function() aimheadToggle:Set(false) end,
-        SetRange = function(range) AttackTab:GetElement("AimbotRange"):Set(range) end,
-        SetSpeed = function(speed) AttackTab:GetElement("AimbotSpeed"):Set(speed) end,
-        SetTarget = function(target) AttackTab:GetElement("AimbotTarget"):Set(target) end
-    }
-end
-
--- Tính năng Misc (Tùy biến Fly, Noclip, Walkspeed, Jump Power)
-MeozLib.Misc = {}
-function MeozLib.Misc:Create()
-    local flyEnabled, noclipEnabled = false, false
-    local flySpeed = 50
-    local walkSpeed, jumpPower = 16, 50
-
-    local function enableFly()
-        local bv = Instance.new("BodyVelocity")
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Parent = humanoidRootPart
-
-        local bg = Instance.new("BodyGyro")
-        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bg.P = 10000
-        bg.Parent = humanoidRootPart
-
-        humanoid.PlatformStand = true
-
-        local noclipConnection = RunService.Stepped:Connect(function()
-            if flyEnabled then
-                for _, part in pairs(character:GetChildren()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-
-        local function updateFly()
-            if not flyEnabled then
-                bv.Velocity = Vector3.new(0, 0, 0)
-                return
-            end
-            local direction = Vector3.new()
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.E) then direction += Vector3.new(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) then direction -= Vector3.new(0, 1, 0) end
-
-            if direction.Magnitude > 0 then
-                bv.Velocity = direction.Unit * flySpeed
-            else
-                bv.Velocity = Vector3.new(0, 0, 0)
-            end
-            bg.CFrame = CFrame.lookAt(humanoidRootPart.Position, humanoidRootPart.Position + camera.CFrame.LookVector)
-        end
-
-        local flyConnection = RunService.RenderStepped:Connect(updateFly)
-        return function()
-            flyConnection:Disconnect()
-            noclipConnection:Disconnect()
-            bv:Destroy()
-            bg:Destroy()
-            humanoid.PlatformStand = false
-            humanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-            for _, part in pairs(character:GetChildren()) do
-                if part:IsA("BasePart") then part.CanCollide = true end
-            end
-        end
-    end
-
-    local function enableNoclip()
-        local connection = RunService.Stepped:Connect(function()
-            if noclipEnabled then
-                for _, part in pairs(character:GetChildren()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-        return function() connection:Disconnect() end
-    end
-
-    local flyDisable, noclipDisable = nil, nil
-
-    -- UI cho Misc
-    local flyToggle = MiscTab:CreateToggle({
-        Name = "Enable Fly",
-        CurrentValue = false,
-        Flag = "FlyToggle",
-        Callback = function(value)
-            flyEnabled = value
-            if flyEnabled then
-                flyDisable = enableFly()
-                notify("Fly Enabled", "Fly with noclip activated!", 6.5)
-            else
-                if flyDisable then flyDisable() end
-                notify("Fly Disabled", "Fly turned off!", 6.5)
-            end
-        end
-    })
-
-    local noclipToggle = MiscTab:CreateToggle({
-        Name = "Enable Noclip",
-        CurrentValue = false,
-        Flag = "NoclipToggle",
-        Callback = function(value)
-            noclipEnabled = value
-            if noclipEnabled then
-                noclipDisable = enableNoclip()
-                notify("Noclip Enabled", "Noclip activated!", 6.5)
-            else
-                if noclipDisable then noclipDisable() end
-                for _, part in pairs(character:GetChildren()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
-                end
-                notify("Noclip Disabled", "Noclip turned off!", 6.5)
-            end
-        end
-    })
-
-    local flySpeedSlider = MiscTab:CreateSlider({
-        Name = "Fly Speed",
-        Range = {10, 200},
-        Increment = 10,
-        Suffix = "Studs/s",
-        CurrentValue = flySpeed,
-        Flag = "FlySpeed",
-        Callback = function(value)
-            flySpeed = value
-            notify("Fly Speed Updated", "Speed set to " .. value .. " studs/s", 5)
-        end
-    })
-
-    local walkSpeedSlider = MiscTab:CreateSlider({
-        Name = "Walkspeed",
-        Range = {0, 1000},
-        Increment = 16,
-        Suffix = "Speed",
-        CurrentValue = walkSpeed,
-        Flag = "WalkSpeed",
-        Callback = function(value)
-            walkSpeed = value
-            humanoid.WalkSpeed = walkSpeed
-            notify("Walkspeed Updated", "Walkspeed set to " .. value, 5)
-        end
-    })
-
-    local jumpPowerSlider = MiscTab:CreateSlider({
-        Name = "Jump Power",
-        Range = {0, 1000},
-        Increment = 16,
-        Suffix = "Jump",
-        CurrentValue = jumpPower,
-        Flag = "JumpPower",
-        Callback = function(value)
-            jumpPower = value
-            humanoid.JumpPower = jumpPower
-            notify("Jump Power Updated", "Jump power set to " .. value, 5)
-        end
-    })
-
-    return {
-        EnableFly = function() flyToggle:Set(true) end,
-        DisableFly = function() flyToggle:Set(false) end,
-        EnableNoclip = function() noclipToggle:Set(true) end,
-        DisableNoclip = function() noclipToggle:Set(false) end,
-        SetFlySpeed = function(speed) flySpeedSlider:Set(speed) end,
-        SetWalkSpeed = function(speed) walkSpeedSlider:Set(speed) end,
-        SetJumpPower = function(power) jumpPowerSlider:Set(power) end
-    }
-end
-
--- Khởi tạo thư viện khi load
-local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
-notify("MeozLib Loaded", "Library loaded on " .. executorName .. "!", 6.5)
-sendWebhook("MeozLib loaded on " .. executorName .. " by " .. player.Name)
-
--- Tạo các tính năng mẫu
-local esp = MeozLib.ESP:Create({
-    Color = Color3.fromRGB(255, 0, 0),
-    Size = 14,
-    Range = 200,
-    TextFormat = "{name} | HP: {hp} | Distance: {distance} studs"
-})
-local aimbot = MeozLib.Aimbot:Create({
-    Speed = 0.1,
-    Range = 100,
-    Target = "Head"
-})
-local misc = MeozLib.Misc:Create()
-
--- Hàm mở rộng (có thể thêm vào MeozLib)
-function MeozLib:AddCustomFeature(name, callback)
-    MainTab:CreateButton({
-        Name = name,
-        Callback = callback
-    })
-    return true
-end
-
-return MeozLib
